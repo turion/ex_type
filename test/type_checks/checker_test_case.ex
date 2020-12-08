@@ -54,4 +54,11 @@ defmodule TypeChecks.CheckerTestCase do
   def get_nested(%Nested{nested: nested}) do
     nested
   end
+
+  @spec function_with_send() :: :foo
+
+  def function_with_send() do
+    send(self(), "hi")
+    :foo
+  end
 end

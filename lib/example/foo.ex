@@ -132,6 +132,16 @@ defmodule ExType.Example.Foo do
     end
   end
 
+  @spec receive_specific_example() :: integer()
+
+  def receive_specific_example() do
+    receive do
+      xs when is_list(xs) -> length(xs)
+      {_, _} -> 2
+      _ -> 0
+    end
+  end
+
   @spec case_example(integer()) :: integer()
 
   def case_example(x) do
@@ -230,5 +240,12 @@ defmodule ExType.Example.Foo do
 
   def add_number(x, y) do
     x + y
+  end
+
+  @spec function_with_send() :: :foo
+
+  def function_with_send() do
+    send(self(), "hi")
+    :foo
   end
 end

@@ -118,6 +118,13 @@ defmodule ExType.CustomEnv do
           token -> token
         end)
 
+    # Manually expand `alias __MODULE__`, see https://github.com/gyson/ex_type/issues/27
+    block = block
+      |> Macro.prewalk(fn
+          {:alias, meta_alias, [{:__MODULE__, meta_module, nil}]} -> {:alias, meta_alias, [{:__aliases__, meta_module, tokens}]}
+          token -> token
+        end)
+
     quote do
       Kernel.defmodule unquote(new_alias) do
         @before_compile ExType.CustomEnv.BeforeCompile

@@ -5,12 +5,12 @@ defmodule ExType.Parser do
   require ExType.Helper
 
   def expand_call({:when, _, [{name, _, args}, guard]}) do
-    {name, args, guard}
+    {name, args || [], guard}
   end
 
   def expand_call({name, _, args}) do
     # `true` guard is the same as no guard
-    {name, args, true}
+    {name, args || [], true}
   end
 
   # return {name, args, guard, block}

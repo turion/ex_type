@@ -246,7 +246,8 @@ defmodule ExType.Typespec do
 
   @spec eval_type(any(), {atom(), %{required(atom()) => Type.t()}}) :: Type.t()
 
-  def eval_type({:any, _, []}, _) do
+  def eval_type({:any, meta, []}, context) do
+    IO.inspect({meta, context}, label: "any")
     %Type.Any{}
   end
 
@@ -285,7 +286,8 @@ defmodule ExType.Typespec do
     %Type.AnyTuple{}
   end
 
-  def eval_type({:float, _, []}, _) do
+  def eval_type({:float, meta, []}, context) do
+    #IO.inspect({meta, context}, label: "float")
     %Type.Float{}
   end
 
@@ -301,6 +303,7 @@ defmodule ExType.Typespec do
   def eval_type({:non_neg_integer, meta, []}, context) do
     # TODO: fix this
     eval_type({:integer, meta, []}, context)
+    #|> IO.inspect(label: "non neg integer")
   end
 
   def eval_type({:pos_integer, meta, []}, context) do
@@ -346,6 +349,7 @@ defmodule ExType.Typespec do
 
   # map
   def eval_type({:%{}, _, args}, context) do
+    IO.inspect(context, label: "map context")
     case args do
       [] ->
         %Type.Map{
@@ -354,6 +358,8 @@ defmodule ExType.Typespec do
         }
 
       [{{header, _, [key_type]}, value_type}] when header in [:required, :optional] ->
+        IO.inspect(key_type, label: "key_type")
+        IO.inspect(value_type, label: "value_type")
         %Type.Map{
           key: eval_type(key_type, context),
           value: eval_type(value_type, context)
@@ -375,6 +381,7 @@ defmodule ExType.Typespec do
 
   # struct
   def eval_type({:%, _, [struct, {:%{}, _, args}]}, context) when is_atom(struct) do
+    IO.inspect(context, label: "struct context")
     if Helper.is_struct(struct) do
       types =
         args
@@ -396,9 +403,11 @@ defmodule ExType.Typespec do
     eval_type({:{}, [], [first, second]}, context)
   end
 
-  def eval_type({:{}, _, args}, context) do
+  def eval_type({:{}, meta, args}, context) do
+    IO.inspect({:{}, meta, args}, label: "args")
+    IO.inspect(context, label: "context")
     %Type.TypedTuple{
-      types: Enum.map(args, &eval_type(&1, context))
+      types: Enum.map(args, &eval_type(IO.inspect(&1, label: "inner"), context))
     }
   end
 
@@ -531,6 +540,7 @@ defmodule ExType.Typespec do
       eval_type({:integer, meta, []}, context),
       eval_type({:float, meta, []}, context)
     ])
+    |> IO.inspect(label: "number")
   end
 
   def eval_type({:timeout, meta, []}, context) do
@@ -605,6 +615,8 @@ defmodule ExType.Typespec do
 
   # type variable
   def eval_type({name, meta, atom}, {_, vars} = context) when is_atom(name) and is_atom(atom) do
+    IO.inspect({name, meta, atom}, label: "type variable?")
+    IO.inspect(context, label: "context tv")
     case vars do
       %{^name => %Type.SpecVariable{} = type} ->
         type
@@ -620,16 +632,23 @@ defmodule ExType.Typespec do
   # local type
   def eval_type({name, _meta, args} = type, {module, _} = context)
       when is_atom(name) and is_list(args) do
+    IO.inspect(context, label: "local type")
+    IO.inspect({name, args}, label: "local type args")
     case from_beam_type(module, name, length(args)) do
       {:ok, {^name, _, type_args}, type_body} ->
         vars =
           args
           |> Enum.map(&eval_type(&1, context))
+          |> IO.inspect(label: "evaluated types")
           |> Enum.zip(type_args)
+          |> IO.inspect(label: "with type args")
           |> Enum.map(fn {type, {var, _, atom}} when is_atom(var) and is_atom(atom) ->
             {var, type}
           end)
           |> Enum.into(%{})
+          |> IO.inspect(label: "vars")
+
+        IO.inspect(type_body, label: "type_body")
 
         eval_type(type_body, {module, vars})
 
@@ -679,9 +698,15 @@ defmodule ExType.Typespec do
               |> Enum.into(%{})
 
             new_context = {module, spec_vars}
+            |> IO.inspect(label: "new_context fetch specs")
+
+            IO.inspect(inputs, label: "inputs fetch specs")
+            IO.inspect(output, label: "output fetch specs")
 
             input_types = Enum.map(inputs, &eval_type(&1, new_context))
+            |> IO.inspect(label: "input_types fetch specs")
             output_type = eval_type(output, new_context)
+            |> IO.inspect(label: "output_type fetch specs")
 
             {input_types, output_type, spec_vars}
           end)

@@ -18,6 +18,10 @@ defprotocol ExType.Typespecable do
   def get_protocol_path(x)
 end
 
+defimpl Typespecable, for: Type.KnownType do
+  def to_quote(%Type.KnownType{key: key}) do
+  
+
 defimpl Typespecable, for: Type.Any do
   def to_quote(_) do
     quote do

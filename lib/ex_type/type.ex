@@ -4,7 +4,8 @@ defmodule ExType.Type do
   alias ExType.Assert
 
   @type t ::
-          ExType.Type.Any.t()
+            ExType.Type.KnownType.t()
+          | ExType.Type.Any.t()
           | ExType.Type.None.t()
           | ExType.Type.Union.t()
           | ExType.Type.Intersection.t()
@@ -29,6 +30,36 @@ defmodule ExType.Type do
           # List.Empty
           | ExType.Type.List.t()
           | ExType.Type.BitString.t()
+
+  defmodule KnownType do
+    @moduledoc """
+    A type that has been processed already.
+    Its value is saved in the ETS table `:known_types`.
+    """
+
+    @type t :: %__MODULE__{key: any()}
+
+    defstruct [:key]
+
+    def register(key, type) do
+      :ok = :ets.insert(:known_types, {key, type})
+      type
+    end
+
+    def get(key) do
+      case :ets.lookup(:known_types, key) do
+        [{^key, type}] -> {:known, type}
+        [] -> nil
+      end
+    end
+
+    def get!(key) do
+      case get(key) do
+        nil -> raise ArgumentError "No type found for key #{key}"
+        type -> type
+      end
+    end
+  end
 
   defmodule Any do
     @moduledoc false

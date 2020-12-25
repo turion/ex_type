@@ -3,6 +3,7 @@
   include: [
     "lib/example/**/*.ex",
     "lib/ex_type.ex",
+    "lib/**/*.ex",
     "test/**/*_test_case.ex"
   ],
 

@@ -386,6 +386,7 @@ defmodule ExType.Typespec do
       types =
         args
         |> Enum.map(fn {key, value} ->
+          IO.inspect({key, value})
           {key, eval_type(value, context)}
         end)
         |> Enum.into(%{})
@@ -394,6 +395,7 @@ defmodule ExType.Typespec do
         struct: struct,
         types: types
       }
+      |> IO.inspect(label: "evaluated struct type")
     else
       raise ArgumentError, "#{struct} is not struct"
     end
@@ -578,21 +580,26 @@ defmodule ExType.Typespec do
     if Helper.is_protocol(module) and name == :t and args == [] do
       %Type.Protocol{module: module}
     else
+      IO.inspect({module, name, args, context}, label: "mod input")
       # This is a bit dangerous because aliases might be defined differently in different places.
       # Ideally we had additional metadata to distinguish them.
       # Or we would even simply pass the types around in the context instead.
       key = {module, name}
+        |> IO.inspect(label: "key")
       with nil <- Type.KnownType.get(key)
            {:ok, {^name, _, type_args}, type_body} <- from_beam_type(module, name, length(args)) do
         vars =
           args
+          |> IO.inspect(label: "args module")
           |> Enum.map(&eval_type(&1, context))
           |> Enum.zip(type_args)
           |> Enum.map(fn {type, {var, _, atom}} when is_atom(var) and is_atom(atom) ->
             {var, type}
           end)
           |> Enum.into(%{})
+          #|> IO.inspect(label: "evaluated module type thingy")
 
+        IO.inspect(type_body, label: "type_body")
         type = eval_type(type_body, {module, vars})
 
         Type.KnownType.register(key, type)

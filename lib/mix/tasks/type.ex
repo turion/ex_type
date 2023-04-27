@@ -1,13 +1,11 @@
 defmodule Mix.Tasks.Type do
   use Mix.Task
 
+  require Logger
+
   def run([]) do
     prepare()
-
-    # could run in parallel
-    for file <- get_files() do
-      ExType.check(file)
-    end
+    check()
   end
 
   # `mix type Enum` for single module
@@ -19,15 +17,20 @@ defmodule Mix.Tasks.Type do
     filter = ExType.Filter.parse(filter)
     ExType.Filter.register(filter)
 
-    # could run in parallel
-    for file <- get_files() do
-      ExType.check(file)
-    end
+    check()
   end
 
   defp prepare() do
     Mix.Task.run("compile", [])
     Mix.Task.run("loadpaths", [])
+  end
+
+  defp check() do
+    # could run in parallel
+    for file <- get_files() do
+      Logger.info("Checking #{file}")
+      ExType.check(file)
+    end
   end
 
   defp get_files() do
@@ -43,6 +46,10 @@ defmodule Mix.Tasks.Type do
       else
         []
       end
+    Logger.debug("""
+      Config from type.exs:
+      #{inspect(config)}
+    """)
 
     if Keyword.get(config, :debug, false) do
       ExType.Debug.set()
@@ -53,10 +60,20 @@ defmodule Mix.Tasks.Type do
       |> Enum.flat_map(fn glob -> Path.wildcard(Path.join(cwd, glob)) end)
       |> Enum.into(MapSet.new())
 
+      Logger.debug("""
+      includes:
+      #{inspect(includes)}
+    """)
+
     excludes =
       Keyword.get(config, :exclude, [])
       |> Enum.flat_map(fn glob -> Path.wildcard(Path.join(cwd, glob)) end)
       |> Enum.into(MapSet.new())
+
+    Logger.debug("""
+      excludes:
+      #{inspect(excludes)}
+    """)
 
     MapSet.difference(includes, excludes)
   end

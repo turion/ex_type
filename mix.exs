@@ -29,7 +29,8 @@ defmodule ExType.MixProject do
     [
       {:ex_type_runtime, "~> 0.2.0"},
       {:ex_doc, "~> 0.23", only: :dev, runtime: false},
-      {:dialyxir, "~> 1.0", only: :dev, runtime: false}
+      {:dialyxir, "~> 1.0", only: :dev, runtime: false},
+      {:decorator, "~> 1.2"}
     ]
   end
 

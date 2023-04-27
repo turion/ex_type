@@ -10,6 +10,9 @@ defmodule ExType.Typespec do
   }
 
   require ExType.Helper
+  use ExType.LoggerDecorator
+
+  require Logger
 
   defmacro deftypespec(name, do: block) do
     module_name =
@@ -246,82 +249,87 @@ defmodule ExType.Typespec do
 
   @spec eval_type(any(), {atom(), %{required(atom()) => Type.t()}}) :: Type.t()
 
-  def eval_type({:any, _, []}, _) do
+  @decorate debug_log([expression: expression, context: context], [log_result: true])
+  def eval_type(expression, context) do
+    eval_type1(expression, context)
+  end
+
+  defp eval_type1({:any, _, []}, _) do
     %Type.Any{}
   end
 
-  def eval_type({:none, _, []}, _) do
+  defp eval_type1({:none, _, []}, _) do
     %Type.None{}
   end
 
-  def eval_type({:atom, _, []}, _) do
+  defp eval_type1({:atom, _, []}, _) do
     %Type.Atom{literal: false}
   end
 
-  def eval_type({:map, _, []}, _) do
+  defp eval_type1({:map, _, []}, _) do
     %Type.Map{
       key: %Type.Any{},
       value: %Type.Any{}
     }
   end
 
-  def eval_type({:pid, _, []}, _) do
+  defp eval_type1({:pid, _, []}, _) do
     %Type.PID{}
   end
 
-  def eval_type({:port, _, []}, _) do
+  defp eval_type1({:port, _, []}, _) do
     %Type.Port{}
   end
 
-  def eval_type({:reference, _, []}, _) do
+  defp eval_type1({:reference, _, []}, _) do
     %Type.Reference{}
   end
 
-  def eval_type({:struct, _, []}, _) do
+  defp eval_type1({:struct, _, []}, _) do
     %Type.Struct{}
   end
 
-  def eval_type({:tuple, _, []}, _) do
+  defp eval_type1({:tuple, _, []}, _) do
     %Type.AnyTuple{}
   end
 
-  def eval_type({:float, _, []}, _) do
+  defp eval_type1({:float, _, []}, _) do
     %Type.Float{}
   end
 
-  def eval_type({:integer, _, []}, _) do
+  defp eval_type1({:integer, _, []}, _) do
     %Type.Integer{}
   end
 
-  def eval_type({:neg_integer, meta, []}, context) do
+  defp eval_type1({:neg_integer, meta, []}, context) do
     # TODO: fix this
     eval_type({:integer, meta, []}, context)
   end
 
-  def eval_type({:non_neg_integer, meta, []}, context) do
+  defp eval_type1({:non_neg_integer, meta, []}, context) do
     # TODO: fix this
     eval_type({:integer, meta, []}, context)
   end
 
-  def eval_type({:pos_integer, meta, []}, context) do
+  defp eval_type1({:pos_integer, meta, []}, context) do
     # TODO: fix this
     eval_type({:integer, meta, []}, context)
   end
 
   # Literals
 
-  def eval_type(atom, _) when is_atom(atom) do
+  defp eval_type1(atom, _) when is_atom(atom) do
     %Type.Atom{literal: true, value: atom}
   end
 
-  def eval_type({:<<>>, meta, _args}, _) do
+  defp eval_type1({:<<>>, meta, _args}, _) do
     Helper.throw(
       message: "TODO: support binary type",
       meta: meta
     )
   end
 
-  def eval_type([{:->, _, [inputs, output]}], context) when is_list(inputs) do
+  defp eval_type1([{:->, _, [inputs, output]}], context) when is_list(inputs) do
     case inputs do
       [{:..., _, _}] ->
         %Type.AnyFunction{}
@@ -334,18 +342,18 @@ defmodule ExType.Typespec do
     end
   end
 
-  def eval_type(integer, context) when is_integer(integer) do
+  defp eval_type1(integer, context) when is_integer(integer) do
     eval_type({:integer, [], []}, context)
   end
 
-  def eval_type([type], context) do
+  defp eval_type1([type], context) do
     %Type.List{type: eval_type(type, context)}
   end
 
   # TODO: support other list types
 
   # map
-  def eval_type({:%{}, _, args}, context) do
+  defp eval_type1({:%{}, _, args}, context) do
     case args do
       [] ->
         %Type.Map{
@@ -374,7 +382,7 @@ defmodule ExType.Typespec do
   end
 
   # struct
-  def eval_type({:%, _, [struct, {:%{}, _, args}]}, context) when is_atom(struct) do
+  defp eval_type1({:%, _, [struct, {:%{}, _, args}]}, context) when is_atom(struct) do
     if Helper.is_struct(struct) do
       types =
         args
@@ -392,11 +400,11 @@ defmodule ExType.Typespec do
     end
   end
 
-  def eval_type({first, second}, context) do
+  defp eval_type1({first, second}, context) do
     eval_type({:{}, [], [first, second]}, context)
   end
 
-  def eval_type({:{}, _, args}, context) do
+  defp eval_type1({:{}, _, args}, context) do
     %Type.TypedTuple{
       types: Enum.map(args, &eval_type(&1, context))
     }
@@ -404,67 +412,67 @@ defmodule ExType.Typespec do
 
   # built-in types
 
-  def eval_type({:term, meta, []}, context) do
+  defp eval_type1({:term, meta, []}, context) do
     eval_type({:any, meta, []}, context)
   end
 
   # The `when x: var` pattern.
   # See https://hexdocs.pm/elixir/typespecs.html#defining-a-specification)
   # and https://github.com/gyson/ex_type/issues/25
-  def eval_type({:var, meta, []}, context) do
+  defp eval_type1({:var, meta, []}, context) do
     eval_type({:any, meta, []}, context)
   end
 
-  def eval_type({:arity, meta, []}, context) do
+  defp eval_type1({:arity, meta, []}, context) do
     # TODO: support range
     eval_type({:integer, meta, []}, context)
   end
 
   # TODO: as_boolean
 
-  def eval_type({:binary, _, []}, _) do
+  defp eval_type1({:binary, _, []}, _) do
     %Type.BitString{}
   end
 
-  def eval_type({:bitstring, _, []}, _) do
+  defp eval_type1({:bitstring, _, []}, _) do
     %Type.BitString{}
   end
 
-  def eval_type({:boolean, _, []}, context) do
+  defp eval_type1({:boolean, _, []}, context) do
     union_types([
       eval_type(true, context),
       eval_type(false, context)
     ])
   end
 
-  def eval_type({:byte, meta, []}, context) do
+  defp eval_type1({:byte, meta, []}, context) do
     # TODO: use range
     eval_type({:integer, meta, []}, context)
   end
 
-  def eval_type({:char, meta, []}, context) do
+  defp eval_type1({:char, meta, []}, context) do
     # TODO: use range
     eval_type({:integer, meta, []}, context)
   end
 
-  def eval_type({:charlist, meta, []}, context) do
+  defp eval_type1({:charlist, meta, []}, context) do
     # TODO: use range
     eval_type([{:char, meta, []}], context)
   end
 
-  def eval_type({:nonempty_charlist, meta, []}, context) do
+  defp eval_type1({:nonempty_charlist, meta, []}, context) do
     eval_type({:nonempty_list, meta, [{:char, meta, []}]}, context)
   end
 
-  def eval_type({:fun, _, []}, _) do
+  defp eval_type1({:fun, _, []}, _) do
     %Type.AnyFunction{}
   end
 
-  def eval_type({:function, meta, []}, context) do
+  defp eval_type1({:function, meta, []}, context) do
     eval_type({:fun, meta, []}, context)
   end
 
-  def eval_type({:identifier, meta, []}, context) do
+  defp eval_type1({:identifier, meta, []}, context) do
     union_types([
       eval_type({:pid, meta, []}, context),
       eval_type({:port, meta, []}, context),
@@ -472,40 +480,40 @@ defmodule ExType.Typespec do
     ])
   end
 
-  def eval_type({:iodata, meta, []}, context) do
+  defp eval_type1({:iodata, meta, []}, context) do
     union_types([
       eval_type({:iolist, meta, []}, context),
       eval_type({:binary, meta, []}, context)
     ])
   end
 
-  def eval_type({:iolist, meta, []}, context) do
+  defp eval_type1({:iolist, meta, []}, context) do
     # TODO: fix this
     eval_type({:list, meta, []}, context)
   end
 
-  def eval_type({:keyword, meta, []}, context) do
+  defp eval_type1({:keyword, meta, []}, context) do
     eval_type({:keyword, meta, [{:any, meta, []}]}, context)
   end
 
-  def eval_type({:keyword, meta, [t]}, context) do
+  defp eval_type1({:keyword, meta, [t]}, context) do
     eval_type([{:{}, meta, [{:atom, meta, []}, t]}], context)
   end
 
-  def eval_type({:list, meta, []}, context) do
+  defp eval_type1({:list, meta, []}, context) do
     eval_type([{:any, meta, []}], context)
   end
 
-  def eval_type({:list, _meta, [arg]}, context) do
+  defp eval_type1({:list, _meta, [arg]}, context) do
     eval_type([arg], context)
   end
 
-  def eval_type({:maybe_improper_list, meta, [_type1, _type2]}, context) do
+  defp eval_type1({:maybe_improper_list, meta, [_type1, _type2]}, context) do
     # TODO: fix this
     eval_type([{:any, meta, []}], context)
   end
 
-  def eval_type({:nonempty_list, _, [arg]}, context) do
+  defp eval_type1({:nonempty_list, _, [arg]}, context) do
     # TODO: fix this
     eval_type([arg], context)
   end
@@ -514,26 +522,26 @@ defmodule ExType.Typespec do
   # TODO: nonempty_maybe_improper_list
   # TODO: mfa
 
-  def eval_type({:module, meta, []}, context) do
+  defp eval_type1({:module, meta, []}, context) do
     eval_type({:atom, meta, []}, context)
   end
 
-  def eval_type({:no_return, meta, []}, context) do
+  defp eval_type1({:no_return, meta, []}, context) do
     eval_type({:none, meta, []}, context)
   end
 
-  def eval_type({:node, meta, []}, context) do
+  defp eval_type1({:node, meta, []}, context) do
     eval_type({:atom, meta, []}, context)
   end
 
-  def eval_type({:number, meta, []}, context) do
+  defp eval_type1({:number, meta, []}, context) do
     union_types([
       eval_type({:integer, meta, []}, context),
       eval_type({:float, meta, []}, context)
     ])
   end
 
-  def eval_type({:timeout, meta, []}, context) do
+  defp eval_type1({:timeout, meta, []}, context) do
     union_types([
       eval_type(:infinity, context),
       eval_type({:non_neg_integer, meta, []}, context)
@@ -543,7 +551,7 @@ defmodule ExType.Typespec do
   # Remote types
 
   # T.&({type_1, type_2})
-  def eval_type({{:., meta, [T, :&]}, _, [tuple_type]}, context) do
+  defp eval_type1({{:., meta, [T, :&]}, _, [tuple_type]}, context) do
     case eval_type(tuple_type, context) do
       %Type.TypedTuple{types: types} ->
         intersect_types(types)
@@ -556,14 +564,14 @@ defmodule ExType.Typespec do
     end
   end
 
-  def eval_type({{:., _, [T, :p]}, _, [module, right]}, context) when is_atom(module) do
+  defp eval_type1({{:., _, [T, :p]}, _, [module, right]}, context) when is_atom(module) do
     %Type.GenericProtocol{
       module: module,
       generic: eval_type(right, context)
     }
   end
 
-  def eval_type({{:., _, [module, name]}, _, args}, context)
+  defp eval_type1({{:., _, [module, name]}, _, args}, context)
       when is_atom(module) and is_atom(name) and is_list(args) do
     if Helper.is_protocol(module) and name == :t and args == [] do
       %Type.Protocol{module: module}
@@ -584,13 +592,13 @@ defmodule ExType.Typespec do
     end
   end
 
-  def eval_type({:"::", _, [_, right]}, context) do
+  defp eval_type1({:"::", _, [_, right]}, context) do
     eval_type(right, context)
   end
 
   # union type
 
-  def eval_type({:|, _, [left, right]}, context) do
+  defp eval_type1({:|, _, [left, right]}, context) do
     union_types([
       eval_type(left, context),
       eval_type(right, context)
@@ -598,13 +606,13 @@ defmodule ExType.Typespec do
   end
 
   # integer range
-  def eval_type({:.., _, [_left, _right]}, _context) do
+  defp eval_type1({:.., _, [_left, _right]}, _context) do
     # TODO: support actual integer range
     %Type.Integer{}
   end
 
   # type variable
-  def eval_type({name, meta, atom}, {_, vars} = context) when is_atom(name) and is_atom(atom) do
+  defp eval_type1({name, meta, atom}, {_, vars} = context) when is_atom(name) and is_atom(atom) do
     case vars do
       %{^name => %Type.SpecVariable{} = type} ->
         type
@@ -618,7 +626,7 @@ defmodule ExType.Typespec do
   end
 
   # local type
-  def eval_type({name, _meta, args} = type, {module, _} = context)
+  defp eval_type1({name, _meta, args} = type, {module, _} = context)
       when is_atom(name) and is_list(args) do
     case from_beam_type(module, name, length(args)) do
       {:ok, {^name, _, type_args}, type_body} ->
@@ -645,7 +653,7 @@ defmodule ExType.Typespec do
     end
   end
 
-  def eval_type({_, meta, _} = type, context) do
+  defp eval_type1({_, meta, _} = type, context) do
     Helper.inspect(%{
       error: :eval_type,
       type: type,
@@ -741,19 +749,24 @@ defmodule ExType.Typespec do
     end
   end
 
-  def match_typespec(map, type, type) do
+  @decorate debug_log([map: map, type1: type1, type2: type2])
+  def match_typespec(map, type1, type2) do
+    match_typespec1(map, type1, type2)
+  end
+
+  defp match_typespec1(map, type, type) do
     map
   end
 
-  def match_typespec(map, %Type.Any{}, _) do
+  defp match_typespec1(map, %Type.Any{}, _) do
     map
   end
 
-  def match_typespec(map, _, %Type.Any{}) do
+  defp match_typespec1(map, _, %Type.Any{}) do
     map
   end
 
-  def match_typespec(map, %Type.SpecVariable{type: constraint} = sv, type) do
+  defp match_typespec1(map, %Type.SpecVariable{type: constraint} = sv, type) do
     case constraint do
       %Type.Any{} ->
         Map.put(map, sv, type)
@@ -763,7 +776,7 @@ defmodule ExType.Typespec do
     end
   end
 
-  def match_typespec(
+  defp match_typespec1(
         map,
         %Type.TypedTuple{types: left_types},
         %Type.TypedTuple{types: right_types}
@@ -775,11 +788,11 @@ defmodule ExType.Typespec do
     end)
   end
 
-  def match_typespec(map, %Type.Atom{literal: false}, %Type.Atom{}) do
+  defp match_typespec1(map, %Type.Atom{literal: false}, %Type.Atom{}) do
     map
   end
 
-  def match_typespec(map, %Type.Atom{literal: true, value: atom_spec}, %Type.Atom{literal: true, value: atom}) do
+  defp match_typespec1(map, %Type.Atom{literal: true, value: atom_spec}, %Type.Atom{literal: true, value: atom}) do
     if atom_spec == atom do
       map
     else
@@ -789,7 +802,7 @@ defmodule ExType.Typespec do
     end
   end
 
-  def match_typespec(
+  defp match_typespec1(
         map,
         %Type.TypedFunction{inputs: inputs, output: output},
         %Type.RawFunction{arity: arity, clauses: clauses, context: fn_context, meta: fn_meta}
@@ -854,7 +867,7 @@ defmodule ExType.Typespec do
     match_typespec(map, output, final_result_type)
   end
 
-  def match_typespec(map, %Type.Protocol{module: module}, type) do
+  defp match_typespec1(map, %Type.Protocol{module: module}, type) do
     {:ok, name} = Typespecable.get_protocol_path(type)
 
     mod = Module.concat([module, name])
@@ -863,7 +876,7 @@ defmodule ExType.Typespec do
     map
   end
 
-  def match_typespec(
+  defp match_typespec1(
         map,
         %Type.GenericProtocol{module: module, generic: generic_typespec},
         %Type.GenericProtocol{module: module, generic: generic_type}
@@ -872,7 +885,7 @@ defmodule ExType.Typespec do
     match_typespec(map, generic_typespec, generic_type)
   end
 
-  def match_typespec(map, %Type.GenericProtocol{module: module, generic: generic}, type) do
+  defp match_typespec1(map, %Type.GenericProtocol{module: module, generic: generic}, type) do
     {:ok, name} = Typespecable.get_protocol_path(type)
 
     mod = Module.concat([module, name])
@@ -886,11 +899,11 @@ defmodule ExType.Typespec do
     end
   end
 
-  def match_typespec(map, %Type.List{type: left_type}, %Type.List{type: right_type}) do
+  defp match_typespec1(map, %Type.List{type: left_type}, %Type.List{type: right_type}) do
     match_typespec(map, left_type, right_type)
   end
 
-  def match_typespec(
+  defp match_typespec1(
         map,
         %Type.Map{key: left_key_type, value: left_value_type},
         %Type.Map{key: right_key_type, value: right_value_type}
@@ -901,13 +914,13 @@ defmodule ExType.Typespec do
   end
 
   # when right type is union, we need to make sure all types matches
-  def match_typespec(map, typespec, %Type.Union{types: union_types}) do
+  defp match_typespec1(map, typespec, %Type.Union{types: union_types}) do
     Enum.reduce(union_types, map, fn type, acc_map ->
       match_typespec(acc_map, typespec, type)
     end)
   end
 
-  def match_typespec(map, %Type.Union{types: union_types} = union, type) do
+  defp match_typespec1(map, %Type.Union{types: union_types} = union, type) do
     union_types
     |> Enum.reduce({map, 0}, fn union_type, {acc_map, count} ->
       try do
@@ -927,11 +940,11 @@ defmodule ExType.Typespec do
     end
   end
 
-  def match_typespec(map, %Type.AnyTuple{}, %Type.TypedTuple{}) do
+  defp match_typespec1(map, %Type.AnyTuple{}, %Type.TypedTuple{}) do
     map
   end
 
-  def match_typespec(_map, typespec, type) do
+  defp match_typespec1(_map, typespec, type) do
     typespec_string =
       typespec
       |> Typespecable.to_quote()

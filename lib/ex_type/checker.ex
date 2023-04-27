@@ -13,23 +13,31 @@ defmodule ExType.Checker do
   }
 
   require ExType.Helper
+  use ExType.LoggerDecorator
+
+  require Logger
 
   @spec eval(Context.t(), any()) :: {Context.t(), Type.t()}
 
-  def eval(context, {:do, block}) do
+  @decorate debug_log([scope: context.scope, expr: expr], [log_result: true])
+  def eval(context, expr) do
+    eval1(context, expr)
+  end
+
+  defp eval1(context, {:do, block}) do
     eval(context, block)
   end
 
   # handle rescue ... end
-  def eval(context, {:rescue, args}) do
+  defp eval1(context, {:rescue, args}) do
     block_of_bindings(context, args)
   end
 
-  def eval(context, {:%{}, _, []}) do
+  defp eval1(context, {:%{}, _, []}) do
     {context, %Type.Map{key: %Type.Any{}, value: %Type.Any{}}}
   end
 
-  def eval(context, {:%{}, meta, args}) when is_list(args) do
+  defp eval1(context, {:%{}, meta, args}) when is_list(args) do
     case Keyword.fetch(args, :__struct__) do
       # e.g. literal range
       # https://github.com/elixir-lang/elixir/blob/0f5fffc0cfc0cbeef6bdca957afef9530fa5ed96/lib/elixir/lib/kernel.ex#L3228
@@ -45,17 +53,17 @@ defmodule ExType.Checker do
   end
 
   # bitstring
-  def eval(context, {:<<>>, _, _}) do
+  defp eval1(context, {:<<>>, _, _}) do
     # TODO: type check internal arguments
     # TODO: distinguish binary and bitstring
     {context, %Type.BitString{}}
   end
 
-  def eval(context, block) when is_binary(block) do
+  defp eval1(context, block) when is_binary(block) do
     {context, %Type.BitString{}}
   end
 
-  def eval(context, {:%, meta, [struct, {:%{}, _, args}]}) when is_atom(struct) do
+  defp eval1(context, {:%, meta, [struct, {:%{}, _, args}]}) when is_atom(struct) do
     if not Helper.is_struct(struct) do
       Helper.throw(
         message: "#{struct} is not struct",
@@ -78,23 +86,23 @@ defmodule ExType.Checker do
   end
 
   # atom literal
-  def eval(context, block) when is_atom(block) do
+  defp eval1(context, block) when is_atom(block) do
     {context, %Type.Atom{literal: true, value: block}}
   end
 
-  def eval(context, block) when is_integer(block) do
+  defp eval1(context, block) when is_integer(block) do
     {context, %Type.Integer{}}
   end
 
-  def eval(context, block) when is_float(block) do
+  defp eval1(context, block) when is_float(block) do
     {context, %Type.Float{}}
   end
 
-  def eval(context, []) do
+  defp eval1(context, []) do
     {context, %Type.List{type: %Type.Any{}}}
   end
 
-  def eval(context, list) when is_list(list) do
+  defp eval1(context, list) when is_list(list) do
     type =
       list
       |> Enum.flat_map(fn
@@ -118,11 +126,11 @@ defmodule ExType.Checker do
 
   # tuple
 
-  def eval(context, {first, second}) do
+  defp eval1(context, {first, second}) do
     eval(context, {:{}, [], [first, second]})
   end
 
-  def eval(context, {:{}, _, args}) do
+  defp eval1(context, {:{}, _, args}) do
     types =
       Enum.map(args, fn arg ->
         {_, val} = eval(context, arg)
@@ -132,7 +140,7 @@ defmodule ExType.Checker do
     {context, %Type.TypedTuple{types: types}}
   end
 
-  def eval(context, {{:., _, [name]}, _, args}) do
+  defp eval1(context, {{:., _, [name]}, _, args}) do
     args_values =
       Enum.map(args, fn arg ->
         {_, val} = eval(context, arg)
@@ -173,7 +181,7 @@ defmodule ExType.Checker do
   end
 
   # support T.inspect
-  def eval(context, {{:., meta, [ExType.T.TypeCheck, :inspect]}, _, args}) do
+  defp eval1(context, {{:., meta, [ExType.T.TypeCheck, :inspect]}, _, args}) do
     location = "#{context.env.file}:#{Keyword.get(meta, :line, "?")}"
 
     case args do
@@ -193,7 +201,7 @@ defmodule ExType.Checker do
   end
 
   # support T.assert
-  def eval(
+  defp eval1(
         context,
         {{:., meta, [ExType.T.TypeCheck, :assert]}, _, [operator, left, escaped_right]}
       ) do
@@ -226,12 +234,12 @@ defmodule ExType.Checker do
     end
   end
 
-  def eval(context, {{:., _, [Module, :get_attribute]}, _, [module, attribute, _line]}) do
+  defp eval1(context, {{:., _, [Module, :get_attribute]}, _, [module, attribute, _line]}) do
     eval(context, Module.get_attribute(module, attribute))
   end
 
   # remote function call, e.g. :erlang.binary_to_term/1, Map.get/2
-  def eval(context, {{:., _, [module, name]}, meta, args})
+  defp eval1(context, {{:., _, [module, name]}, meta, args})
       when is_atom(module) and is_atom(name) do
     args_types =
       Enum.map(args, fn arg ->
@@ -285,7 +293,7 @@ defmodule ExType.Checker do
   end
 
   # function
-  def eval(context, {:fn, meta, raw_clauses}) when is_list(raw_clauses) do
+  defp eval1(context, {:fn, meta, raw_clauses}) when is_list(raw_clauses) do
     clauses =
       Enum.map(raw_clauses, fn
         {:->, _, [[{:when, _, when_args}], body]} ->
@@ -309,11 +317,11 @@ defmodule ExType.Checker do
   end
 
   # variable
-  def eval(context, {var, _, ctx}) when is_atom(var) and is_atom(ctx) do
+  defp eval1(context, {var, _, ctx}) when is_atom(var) and is_atom(ctx) do
     {context, Map.fetch!(context.scope, var)}
   end
 
-  def eval(context, {:__block__, _, exprs}) do
+  defp eval1(context, {:__block__, _, exprs}) do
     default_nil = %Type.Atom{literal: true, value: nil}
 
     {_, type} =
@@ -325,7 +333,7 @@ defmodule ExType.Checker do
     {context, type}
   end
 
-  def eval(context, {:=, _, [left, right]}) do
+  defp eval1(context, {:=, _, [left, right]}) do
     {context, type} = eval(context, right)
     context = Unification.unify_pattern(context, left, type)
     {context, type}
@@ -334,7 +342,7 @@ defmodule ExType.Checker do
   # unify pattern and spec
 
   # TODO: improve it for union types
-  def eval(context, {:case, _, [exp, [do: block]]}) do
+  defp eval1(context, {:case, _, [exp, [do: block]]}) do
     {_, type} = eval(context, exp)
 
     # TODO: if exp is a variable, we need to update it's variable type within scope
@@ -374,7 +382,7 @@ defmodule ExType.Checker do
     {context, unioned_type}
   end
 
-  def eval(context, {:cond, _, [[do: block]]}) do
+  defp eval1(context, {:cond, _, [[do: block]]}) do
     t =
       for {:->, _, [[left], right]} <- block do
         {_, left_type} = eval(context, left)
@@ -399,7 +407,7 @@ defmodule ExType.Checker do
   end
 
   # for expression
-  def eval(context, {:for, _, args}) do
+  defp eval1(context, {:for, _, args}) do
     case args do
       [{:<-, _, [left, right]}, [do: expr]] ->
         {_, right_type} = eval(context, right)
@@ -429,7 +437,7 @@ defmodule ExType.Checker do
     end
   end
 
-  def eval(context, {:with, _, args}) do
+  defp eval1(context, {:with, _, args}) do
     case args do
       [{:<-, _, [left, right]}, [do: expr]] ->
         {_, type} = eval(context, right)
@@ -441,12 +449,12 @@ defmodule ExType.Checker do
   end
 
   # handle receive do ... end
-  def eval(context, {:receive, _, [[do: args]]}) do
+  defp eval1(context, {:receive, _, [[do: args]]}) do
     block_of_bindings(context, args)
   end
 
   # function call, e.g. 1 + 1
-  def eval(context, {name, meta, args}) when is_atom(name) and is_list(args) do
+  defp eval1(context, {name, meta, args}) when is_atom(name) and is_list(args) do
     arity = length(args)
 
     args_types =
@@ -533,7 +541,7 @@ defmodule ExType.Checker do
     end
   end
 
-  def eval(context, {{:., meta, [left, right]}, _, []}) when is_atom(right) do
+  defp eval1(context, {{:., meta, [left, right]}, _, []}) when is_atom(right) do
     case eval(context, left) do
       {_, %{__struct__: type_struct, types: types}}
       when type_struct in [Type.StructLikeMap, Type.Struct] ->
@@ -551,7 +559,7 @@ defmodule ExType.Checker do
     end
   end
 
-  def eval(context, {_, meta, _} = code) do
+  defp eval1(context, {_, meta, _} = code) do
     Helper.throw(
       message: "unsupported code: #{Macro.to_string(code)}",
       context: context,

@@ -1,6 +1,8 @@
 defmodule ExType.Context do
   @moduledoc false
 
+  @derive {Inspect, only: [:scope, :type_variables, :functions, :stacks]}
+
   @type t :: %__MODULE__{
           env: any(),
           scope: any(),
@@ -29,13 +31,5 @@ defmodule ExType.Context do
 
   def append_stack(%__MODULE__{stacks: stacks} = context, name, arity) do
     %{context | stacks: [{name, arity} | stacks]}
-  end
-end
-
-defimpl Inspect, for: ExType.Context do
-  @moduledoc false
-
-  def inspect(_env, _opts) do
-    "%ExType.Context{}"
   end
 end

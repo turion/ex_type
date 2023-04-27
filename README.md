@@ -2,11 +2,13 @@
 
 A type checker for Elixir.
 
-## Feature
+Forked from https://github.com/gyson/ex_type.
+
+## Features
 
 - gradual typing
-- type check for protocols and generic protocols
-- type check with intersection and union types
+- type checking for protocols and generic protocols
+- type checking with intersection and union types
 - type guards
 - type assertion
 - type inspection
@@ -53,7 +55,7 @@ $ mix type ExType.Example.Foo.hello
 $ mix type ExType.Example.Foo.hello/0
 ```
 
-## Example
+## Examples
 
 There are some examples in `lib/ex_type/example/` directory.
 
@@ -61,7 +63,7 @@ There are some examples in `lib/ex_type/example/` directory.
 
 This project is still in a very early stage with active development. You are likely to hit
 uncovered cases when playing more complex code beyond the examples. Be free to submit [a github
-issue](https://github.com/gyson/ex_type/issues/new) for a bug report or any feedback.
+issue](https://github.com/turion/ex_type/issues/new) for a bug report or any feedback.
 
 ## Roadmap
 
@@ -77,7 +79,7 @@ Plan to apply ExType to following small-sized libraries first:
 
 - Use `MIX_ENV=test iex -S mix` to access test context.
 
-- It uses serveral Elixir private APIs. It should be ok for now because `ex_type` is
+- It uses several Elixir private APIs. It should be ok for now because `ex_type` is
   a development dependency, not a runtime dependency. Would like to reduce private API
   usage at later time when the project is more mature.
 

@@ -1,9 +1,3 @@
-defmodule ExType.Checker.EvalError do
-  @moduledoc false
-
-  defstruct [:code, :context, :line]
-end
-
 defmodule ExType.Checker do
   @moduledoc false
 

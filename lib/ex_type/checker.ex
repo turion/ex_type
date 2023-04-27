@@ -1,9 +1,3 @@
-defmodule ExType.Checker.EvalError do
-  @moduledoc false
-
-  defstruct [:code, :context, :line]
-end
-
 defmodule ExType.Checker do
   @moduledoc false
 
@@ -255,7 +249,7 @@ defmodule ExType.Checker do
           name == :exception and length(args) == 1 and Helper.is_exception(module) ->
             expr =
               quote(do: %unquote(module){message: ""})
-              |> :elixir_expand.expand(__ENV__)
+              |> Macro.expand(__ENV__)
               |> elem(0)
 
             eval(context, expr)

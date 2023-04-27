@@ -24,7 +24,7 @@ defmodule ExType.Filter do
   def parse(name) do
     name
     |> Code.string_to_quoted!()
-    |> :elixir_expand.expand(__ENV__)
+    |> Macro.expand(__ENV__)
     |> elem(0)
     |> case do
       # check single function with specified arity

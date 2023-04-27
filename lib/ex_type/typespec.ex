@@ -801,6 +801,7 @@ defmodule ExType.Typespec do
         clauses
         |> Enum.flat_map(fn {args, guard, body} ->
           try do
+            IO.inspect(args, label: "args")
             new_fn_context =
               Enum.zip(args, input_types)
               |> Enum.reduce(fn_context, fn {arg, input_type}, fn_context ->
@@ -873,6 +874,7 @@ defmodule ExType.Typespec do
   end
 
   def match_typespec(map, %Type.GenericProtocol{module: module, generic: generic}, type) do
+    IO.inspect(type, label: "type")
     {:ok, name} = Typespecable.get_protocol_path(type)
 
     mod = Module.concat([module, name])

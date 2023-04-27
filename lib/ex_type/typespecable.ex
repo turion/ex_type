@@ -109,7 +109,7 @@ defimpl Typespecable, for: Type.Protocol do
     type
   end
 
-  def get_protocol_path(_), do: :error
+  def get_protocol_path(%Type.Protocol{module: module}), do: {:ok, module} # FIXME how sensible is this?
 end
 
 defimpl Typespecable, for: Type.GenericProtocol do

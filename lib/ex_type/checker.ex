@@ -316,7 +316,10 @@ defmodule ExType.Checker do
 
   # variable
   def eval(context, {var, _, ctx}) when is_atom(var) and is_atom(ctx) do
+    IO.inspect({var, ctx}, label: "Looking up var")
+    IO.inspect(context.scope, label: "context.scope")
     {context, Map.fetch!(context.scope, var)}
+    |> IO.inspect(label: "evaluated var type")
   end
 
   def eval(context, {:__block__, _, exprs}) do
@@ -451,24 +454,50 @@ defmodule ExType.Checker do
     block_of_bindings(context, args)
   end
 
+  # & capture variable e.g. &2
+  def eval(context, {:&, _meta, [index]}) when is_integer(index) do
+    IO.inspect(Map.from_struct(context), label: "context")
+    raise "How do I look up the capture from the context"
+  end
+
+  # & capture, e.g. &(&1 + &2)
+  def eval(context, {:&, meta, [body]}) do
+    {_, arity} = n_capture_variables(body)
+
+    # lazy eval
+    {context,
+     %Type.RawFunction{
+       arity: arity,
+       clauses: [{Enum.to_list(1..arity), true, body}],
+       context: context,
+       meta: meta
+     }}
+  end
+
+  def eval(_context, {:&, _meta, body}) do
+    raise "Ill-formed capture with body #{inspect(body)}"
+  end
+
   # function call, e.g. 1 + 1
   def eval(context, {name, meta, args}) when is_atom(name) and is_list(args) do
+    IO.inspect({name, meta, args}, label: "function call")
     arity = length(args)
 
     args_types =
       Enum.map(args, fn arg ->
+        IO.inspect(arg, label: "eval for arg type")
         {_, type} = eval(context, arg)
         type
       end)
 
     module = Helper.get_module(context.env.module)
 
-    case Typespec.eval_spec(module, name, args_types) do
+    case IO.inspect(Typespec.eval_spec(module, name, args_types), label: "eval spec") do
       {:ok, output} ->
         {context, output}
 
       {:error, :not_found} ->
-        case Map.fetch(context.functions, {name, arity}) do
+        case IO.inspect(Map.fetch(context.functions, {name, arity}), label: "fetch function") do
           {:ok, fns} ->
             result_type =
               fns
@@ -511,19 +540,26 @@ defmodule ExType.Checker do
 
           :error ->
             context.env.functions
+            |> IO.inspect(label: "context.env.functions")
             |> Enum.find(fn {_, list} ->
               Enum.any?(list, fn {n, a} -> n == name and a == arity end)
             end)
+            |> IO.inspect(label: "found")
             |> case do
               {module, _} ->
                 eval(
                   context,
                   {{:., meta, [module, name]}, meta, args}
                 )
+                |> IO.inspect(label: "module")
 
               nil ->
+                IO.puts("unknown call")
                 Helper.throw(
-                  message: "unknown call #{name}/#{length(args)}",
+                  message: """
+                    unknown call #{name}/#{length(args)}
+                    #{inspect(args)}
+                    """,
                   context: context,
                   meta: meta
                 )
@@ -563,6 +599,14 @@ defmodule ExType.Checker do
       context: context,
       meta: meta
     )
+  end
+
+  # For a capture expression like &{&1 + &3}, finds the number of the highest capture
+  defp n_capture_variables(ast) do
+    Macro.traverse(ast, 1, fn
+      expression = {:&, _meta, [n]}, acc -> {expression, max(n, acc)}
+      expression, acc -> {expression, acc}
+    end, fn expression, acc -> {expression, acc} end)
   end
 
   defp block_of_bindings(context, args) do

@@ -6,12 +6,15 @@ defmodule ExTypeTest do
   use ExUnit.Case
   import ExUnit.CaptureIO
 
+  require Logger
+
   alias ExType.Emoji
 
   doctest ExType
 
   for file <- Path.wildcard("#{__DIR__}/type_checks/**/*.ex") do
     test "type check test case #{file}" do
+      ExType.check(unquote(file))
       result = capture_io(fn -> ExType.check(unquote(file)) end)
 
       assert String.contains?(result, [Emoji.one_test_pass()]), result

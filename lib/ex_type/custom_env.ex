@@ -11,6 +11,7 @@ defmodule ExType.CustomEnv do
   }
 
   require ExType.Helper
+  require Logger
 
   defmodule BeforeCompile do
     @moduledoc false
@@ -54,7 +55,12 @@ defmodule ExType.CustomEnv do
       |> Enum.filter(fn {_, _, name, arity} ->
         case ExType.Typespec.from_beam_spec(module, name, arity) do
           {:ok, _} -> true
-          {:error, _} -> false
+          {:error, _} ->
+            Logger.debug("""
+              Not checking #{inspect({module, name, arity})} because of missing BEAM spec.
+              (Try changing the compiled modules in your mix.exs.)
+            """)
+            false
         end
       end)
       |> Enum.group_by(fn {_, _, name, arity} -> {name, arity} end, fn {call, block, _, _} ->

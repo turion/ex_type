@@ -1,9 +1,10 @@
 [
   # find these files
   include: [
-    "lib/example/**/*.ex",
-    "lib/ex_type.ex",
-    "test/**/*_test_case.ex"
+    # "lib/example/**/*.ex",
+    # "lib/ex_type.ex",
+    # "test/**/*.ex"
+    "test/type_checks/functions.ex"
   ],
 
   # exclude these files
